@@ -1,10 +1,5 @@
-use hyper::{
-    body::Buf,
-    client::{Client as HyperClient, HttpConnector},
-};
-#[cfg(feature = "with-openssl")]
-use hyper_openssl::HttpsConnector;
-#[cfg(feature = "with-hypertls")]
+use hyper::body::Buf;
+use hyper::client::{Client as HyperClient, HttpConnector};
 use hyper_tls::HttpsConnector;
 use serde;
 use serde_json;
@@ -106,10 +101,7 @@ impl CachedCerts {
 
 impl Client {
     pub fn new() -> Client {
-        #[cfg(feature = "with-hypertls")]
         let ssl = HttpsConnector::new();
-        #[cfg(feature = "with-openssl")]
-        let ssl = HttpsConnector::new().expect("unable to build HttpsConnector");
         let client = HyperClient::builder()
             .http2_max_frame_size(0x2000)
             .pool_max_idle_per_host(0)
@@ -141,7 +133,7 @@ impl Client {
             validation.set_audience(&self.audiences);
             let token_data = jsonwebtoken::decode::<IdInfo>(
                 &id_token,
-                &DecodingKey::from_rsa_components(&cert.n, &cert.e),
+                &DecodingKey::from_rsa_components(&cert.n, &cert.e).unwrap(),
                 &validation,
             )?;
 
@@ -195,7 +187,7 @@ impl Client {
             if let Ok(value) = value.to_str() {
                 if let Some(cc) = cache_control::CacheControl::from_value(value) {
                     if let Some(max_age) = cc.max_age {
-                        let seconds = max_age.num_seconds();
+                        let seconds = max_age.as_secs();
                         if seconds >= 0 {
                             *cache = Some(Instant::now() + Duration::from_secs(seconds as u64));
                         }
